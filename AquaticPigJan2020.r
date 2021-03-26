@@ -61,12 +61,12 @@ library(randomForest)
 library(knitr)
 library(ape)
 library(ggpubr)
-library(agricolae)
 library(Rmisc)
 library(multcompView)
 library(randomForestCI)
+
 set.seed(10)
-cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#000000","#CC79A7")
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#000000","#CC79A7","#F0E442")
 theme_set(theme_bw(base_size = 18)+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
 biom=import_biom("C:\\Users\\Joe Receveur\\Documents\\MSU data\\Aquatic Pig\\AquaticPigWTax6.25.19.biom",parseFunction=parse_taxonomy_silva_128)
 tax_table(biom)
@@ -83,11 +83,9 @@ sampdat=sample_data(metadata)
 sample_names(sampdat)=metadata$id
 physeq=merge_phyloseq(biom,sampdat,tree)
 physeq
-sum(otu_table(physeq)[,3])
-physeq<-filter_taxa(physeq, function (x) {sum(x > 0) > 1}, prune=TRUE)
 
 
-# #removing singletons and phyla not present in 10% of samples
+# #removing singletons and phyla not present in 10% of samples (Singletons already removed in QIIME)
 # physeq_phy <- tax_glom(physeq, taxrank = 'Phylum')
 # physeq_phyla <- filter_taxa(physeq_phy, function(x) sum(x > 1) > (0.10*length(x)), TRUE)
 # physeq_phyla_rel <- transform_sample_counts(physeq_phyla, function(OTU) OTU/sum(OTU) )
@@ -125,7 +123,7 @@ dev.off()
 dev.off()
 tiff("Figures/TempAndSalCombined.tiff", width = 74, height = 150, units = 'mm', res = 1200)
 ggarrange(TempPlot,SalinityPlot,
-          labels = c("A", "B"), nrow = 2)
+          labels = c("a", "b"), nrow = 2)
 dev.off()
 
 
@@ -161,12 +159,14 @@ Trtdata <- ddply(df, c("Family"), summarise,
 Trtdata
 
 #Phylum level plot
-compare_means(Abundance~DecompStage, data=df,group.by="Phylum",method = "kruskal.test",p.adjust.method="fdr")
-compare_means(Abundance ~ DecompStage, data = df, group.by = "Phylum", p.adjust.method = "fdr")
 PhylumLevel3 = filter_taxa(PhylumAll, function(x) mean(x) > 3e-2, TRUE) #filter out any taxa lower tha 1%
 
 df <- psmelt(PhylumLevel3)
 df$Abundance=df$Abundance*100
+
+compare_means(Abundance~DecompStage, data=df,group.by="Phylum",method = "kruskal.test",p.adjust.method="fdr")
+compare_means(Abundance ~ DecompStage, data = df, group.by = "Phylum", p.adjust.method = "fdr")
+
 Trtdata <- ddply(df, c("Phylum","DecompStage"), summarise,
                  N    = length(Abundance),
                  mean = mean(Abundance),
@@ -174,35 +174,63 @@ Trtdata <- ddply(df, c("Phylum","DecompStage"), summarise,
                  se   = sd / sqrt(N)
 )
 Trtdata
-
-NComparisons<-length(unique(metadata$DecompStage))*length(unique(Trtdata$Phylum))
-SigList<-length(unique(Trtdata$Phylum))
-SigLetters2<-vector(length=NComparisons)
+#SigList<-length(unique(Trtdata$Phylum))
+#SigLetters2<-vector(length=NComparisons)
 #vec<-unlist(lst)
-Means=compare_means(Abundance ~ DecompStage, data = df, group.by = "Phylum", p.adjust.method = "fdr")
-for (i in levels(Means$Phylum)){
-  Tax<-i
-  TaxAbundance<-subset(Means,Phylum==i )
-  Hyphenated<-as.character(paste0(TaxAbundance$group1,"-",TaxAbundance$group2))
-  difference<-TaxAbundance$p.adj
-  names(difference)<-Hyphenated
-  Letters<-multcompLetters(difference)
-  #print(Letters)
-  SigList[i]<-Letters
-  
-}
-vec<-unlist(SigList)
-vec<-vec[-1]
+Means=compare_means(Abundance ~ DecompStage, data = df, group.by = "Phylum", p.adjust.method = "fdr",method="wilcox.test")
+#Means
+# Multicomp letters for Single family
+# Bacteroidetes<- subset(Means,Phylum=="Bacteroidetes")
+# Hyphenated<-as.character(paste0(Bacteroidetes$group1,"-",Bacteroidetes$group2))
+# difference<-Bacteroidetes$p.adj
+# names(difference)<-Hyphenated
+# 
+# Letters<-multcompLetters(difference)
+# Letters
 
-KWResults<-c("Kruskal-Wallis,\n P-adj < 0.001","KW, P-adj =0.042","KW, P-adj = 0.035","    P-adj < 0.001")
+#Multicomp letters for all families
+# for (i in levels(Means$Phylum)){
+#   Tax<-i
+#   TaxAbundance<-subset(Means,Phylum==i )
+#   Hyphenated<-as.character(paste0(TaxAbundance$group1,"-",TaxAbundance$group2))
+#   difference<-TaxAbundance$p.adj
+#   names(difference)<-Hyphenated
+#   Letters<-multcompLetters(difference)
+#   #print(Letters)
+#   SigList[i]<-Letters
+#   
+# }
+# SigList
+# vec<-unlist(SigList)
+# vec<-vec[-1]
+
+vec<-c("a","a","b","b","b",
+       "ab","a","ab","ab","b",
+       "ab","ab","a","ab","b",
+       "ab","a","bc","c","c")
+# 
+ KWResults<-c("Kruskal-Wallis,\n P-adj < 0.001","KW, P-adj = 0.042","KW, P-adj = 0.035","    P-adj < 0.001")
+# 
+# 
+dat_text <- data.frame(
+  Phylum = c("Bacteroidetes", "Epsilonbacteraeota", "Firmicutes","Proteobacteria"),
+  label   = c("Kruskal-Wallis,\n P-adj < 0.001", "KW, \n P-adj = 0.042", "KW, \n P-adj = 0.035","    P-adj \n< 0.001"),
+  DecompStage     = c(3.6, 3.6, 3.6,4.5),
+  mean     = c(75,75,75,75)
+)
+
+
 PhylumPlotDecompStage=ggplot(Trtdata, aes(x=DecompStage,y=mean))+geom_bar(aes(fill = DecompStage),colour="black", stat="identity")+
   facet_grid(~Phylum)+xlab("Decomp Stage")+ylab("Relative Abundance (> 3%, SEM)") + theme(axis.text.x = element_text(angle = 0, hjust = 0.5))+
   theme(axis.title.x=element_blank())+facet_wrap(~Phylum)+geom_errorbar(aes(ymin=mean-se,ymax=mean+se))+geom_text(aes(x=DecompStage, y=mean+se+10,label=vec))+
-  scale_fill_manual(values=cbPalette)+ theme(legend.position = "none")+annotate("text", label = KWResults, size = 2.5, x = 3.6, y = 75)+
-  scale_x_discrete(labels=c("SubmergedFresh" = "SF","EarlyFloating"= "EF","Floatingdecay"="FD","Advancedfloatingdecay"="AFD","SunkenRemains"="SR"))
+  scale_fill_manual(values=cbPalette)+ theme(legend.position = "none")+
+  scale_x_discrete(labels=c("SubmergedFresh" = "SF","EarlyFloating"= "EF","Floatingdecay"="FD","Advancedfloatingdecay"="AFD","SunkenRemains"="SR"))+
+  geom_text(data=dat_text,aes(label=label,x=DecompStage,y=mean),size=3.5)#+
+
+  
 #scale_x_discrete(labels=c("0 hrs", "24 hrs", "48 hrs","72 hrs"))+ theme(axis.text.x = element_text(angle = 45, hjust = 1))#+ scale_fill_manual(values=cbPalette)
 PhylumPlotDecompStage
-theme_set(theme_bw(base_size = 11)+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
+#theme_set(theme_bw(base_size = 11)+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
 
 
 dev.off()
@@ -231,26 +259,51 @@ SigList<-length(unique(Trtdata$Family))
 SigLetters2<-vector(length=NComparisons)
 #vec<-unlist(lst)
 Means=compare_means(Abundance ~ DecompStage, data = df, group.by = "Family", p.adjust.method = "fdr")
-for (i in levels(Means$Family)){
-  Tax<-i
-  TaxAbundance<-subset(Means,Family==i )
-  Hyphenated<-as.character(paste0(TaxAbundance$group1,"-",TaxAbundance$group2))
-  difference<-TaxAbundance$p.adj
-  names(difference)<-Hyphenated
-  Letters<-multcompLetters(difference)
-  #print(Letters)
-  SigList[i]<-Letters
-  
-}
-vec2<-unlist(SigList)
-vec2<-vec2[-1]
+Means
 
-KWResults<-c("\n Kruskal-Wallis,\n P-adj < 0.001","P-adj = 0.001","P-adj = 0.003","P-adj < 0.001","P-adj = 0.005","P-adj < 0.001","P-adj = 0.037")
+
+
+
+# for (i in levels(Means$Family)){
+#   Tax<-i 
+#   TaxAbundance<-subset(Means,Family==i )
+#   Hyphenated<-as.character(paste0(TaxAbundance$group1,"-",TaxAbundance$group2))
+#   difference<-TaxAbundance$p.adj
+#   names(difference)<-Hyphenated
+#   Letters<-multcompLetters(difference)
+#   #print(Letters)
+#   SigList[i]<-Letters
+#   
+# }
+# vec2<-unlist(SigList)
+# vec2<-vec2[-1]
+
+vec2<-c("a","ab","bc","bc","c",
+       "a","b","c","bc","b",
+       "ab","a","b","b","b",
+       "ab","a","b","bc","c",
+       "a","ab","b","ab","a",
+       "a","a","a","ab","b",
+       "a","a","a","a","a")
+
+#unique(Trtdata$Family)
+dat_text <- data.frame(
+  Family = c("Aeromonadaceae", "Bacteroidaceae", "Burkholderiaceae","Chromobacteriaceae","Clostridiaceae 1","Moraxellaceae","Rhodocyclaceae"),
+  label   = c("\n KW,P-adj \n< 0.001","P-adj =\n 0.001","P-adj = \n 0.003","P-adj \n< 0.001","P-adj =\n0.005","P-adj \n< 0.001","P-adj =\n 0.037"),
+  DecompStage     = c(3.6,1.6,4.3,3.6,1.6,4.4,4),
+  mean     = c(28,28,25,25,25,25,25)
+)
+
+
+KWResults<-c("Kruskal-Wallis,\n P-adj < 0.001","P-adj = 0.001","P-adj = 0.003","P-adj < 0.001","P-adj = 0.005","P-adj < 0.001","P-adj = 0.037")
 FamilyPlotDecompStage=ggplot(Trtdata, aes(x=DecompStage,y=mean))+geom_bar(aes(fill = DecompStage),colour="black", stat="identity")+
   facet_grid(~Family)+xlab("Decomp Stage")+ylab("Relative Abundance (> 3%, SEM)") + theme(axis.text.x = element_text(angle = 0, hjust = 0.5))+
-  theme(axis.title.x=element_blank())+facet_wrap(~Family)+geom_errorbar(aes(ymin=mean-se,ymax=mean+se))+geom_text(aes(x=DecompStage, y=mean+se+3,label=vec2),size=3)+
+  theme(axis.title.x=element_blank())+facet_wrap(~Family)+geom_errorbar(aes(ymin=mean-se,ymax=mean+se))+geom_text(aes(x=DecompStage, y=mean+se+5,label=vec2))+
   scale_fill_manual(values=cbPalette)+ theme(legend.position = "none")+
-  scale_x_discrete(labels=c("SubmergedFresh" = "SF","EarlyFloating"= "EF","Floatingdecay"="FD","Advancedfloatingdecay"="AFD","SunkenRemains"="SR"))+annotate("text", label = KWResults, size = 2.5, x = 3.6, y = 33)
+  scale_x_discrete(labels=c("SubmergedFresh" = "SF","EarlyFloating"= "EF","Floatingdecay"="FD","Advancedfloatingdecay"="AFD","SunkenRemains"="SR"))#+
+  geom_text(data=dat_text,aes(label=label,x=DecompStage,y=mean),size=2.8)
+
+#+annotate("text", label = KWResults, size = 2.5, x = 3.6, y = 33)
 #scale_x_discrete(labels=c("0 hrs", "24 hrs", "48 hrs","72 hrs"))+ theme(axis.text.x = element_text(angle = 45, hjust = 1))#+ scale_fill_manual(values=cbPalette)
 FamilyPlotDecompStage
 theme_set(theme_bw(base_size = 7.5)+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
@@ -276,10 +329,13 @@ LettersShannon<-multcompLetters(difference)
 stats<-summarySE(metadata,measurevar="shannon",groupvars=c("DecompStage",na.rm=TRUE))
 ShannonDecomp<-ggplot(stats,aes(x=DecompStage,y=shannon,fill=DecompStage))+geom_bar(stat="identity",colour="black")+
   geom_errorbar(aes(ymin=shannon-se,ymax=shannon+se),color="black")+
-  geom_text(aes(x=DecompStage, y=shannon+se+0.5,label=LettersShannon$Letters), position=position_dodge(width=0.9), size=3,color="black")+ #Write in labels from posthoc
-  theme(axis.text.x = element_text(angle = 0, hjust = 0.5))+ scale_fill_manual(values=cbPalette)+xlab("")+ylab("Shannon Diversity (SEM)")+labs(fill="Decomposition Stage")+guides(fill=FALSE)+
-  scale_x_discrete(labels=c("SubmergedFresh" = "Submerged\n Fresh","EarlyFloating"= "Early\n Floating","Floatingdecay"="Floating\n Decay","Advancedfloatingdecay"="Advanced\n Floating Decay","SunkenRemains"="Sunken\n Remains"))+
-  annotate("text", label = "Chi-squared = 18.7, P < 0.001", size = 3, x = 2.5, y = 8.5)#+ theme(legend.justification=c(0.05,0.95), legend.position=c(0.05,0.95))
+  geom_text(aes(x=DecompStage, y=shannon+se+0.5,label=LettersShannon$Letters), position=position_dodge(width=0.9), size=3.5,color="black")+ #Write in labels from posthoc
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5,size=7.5))+ scale_fill_manual(values=cbPalette)+xlab("")+ylab("Shannon Diversity (SEM)")+labs(fill="Decomposition Stage")+guides(fill=FALSE)+
+  scale_x_discrete(labels=c("SubmergedFresh" = "Submerged\n Fresh","EarlyFloating"= "Early\n Floating","Floatingdecay"="Floating\n Decay","Advancedfloatingdecay"="Advanced\n Floating","SunkenRemains"="Sunken\n Remains")) + 
+  annotate("text", label = expression(paste("KW,",chi^2, "= 18.7, P-adj < 0.001")), size = 3.5, x = 2.5, y = 8.5)#+ theme(legend.justification=c(0.05,0.95), legend.position=c(0.05,0.95))
+theme_set(theme_bw(base_size = 9)+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
+
+ShannonDecomp
 
 dev.off()
 tiff("Figures/ShannonPlotDecompStage.tiff", width = 74, height = 74, units = 'mm', res = 600)
@@ -302,10 +358,10 @@ Letters<-multcompLetters(difference)
 stats<-summarySE(metadata,measurevar="faith_pd",groupvars=c("DecompStage",na.rm=TRUE))
 faith_pdDecomp<-ggplot(stats,aes(x=DecompStage,y=faith_pd,fill=DecompStage))+geom_bar(stat="identity",colour="black")+
   geom_errorbar(aes(ymin=faith_pd-se,ymax=faith_pd+se),color="black")+
-  geom_text(aes(x=DecompStage, y=faith_pd+se+4,label=Letters$Letters), position=position_dodge(width=0.9), size=3,color="black")+ #Write in labels from posthoc
-  theme(axis.text.x = element_text(angle = 0, hjust = 0.5))+ scale_fill_manual(values=cbPalette)+xlab("")+ylab("Faith's Phylogenetic Diversity (SEM)")+labs(fill="Decomposition Stage")+guides(fill=FALSE)+
-  scale_x_discrete(labels=c("SubmergedFresh" = "Submerged\n Fresh","EarlyFloating"= "Early\n Floating","Floatingdecay"="Floating\n Decay","Advancedfloatingdecay"="Advanced\n Floating Decay","SunkenRemains"="Sunken\n Remains"))+
-  annotate("text", label = "Chi-squared = 19.25, P < 0.001", size = 3, x = 2.4, y = 50)#+ theme(legend.justification=c(0.05,0.95), legend.position=c(0.05,0.95))
+  geom_text(aes(x=DecompStage, y=faith_pd+se+4,label=Letters$Letters), position=position_dodge(width=0.9), size=3.5,color="black")+ #Write in labels from posthoc
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5,size=7.5))+ scale_fill_manual(values=cbPalette)+xlab("")+ylab("Faith's Phylogenetic Diversity (SEM)")+labs(fill="Decomposition Stage")+guides(fill=FALSE)+
+  scale_x_discrete(labels=c("SubmergedFresh" = "Submerged\n Fresh","EarlyFloating"= "Early\n Floating","Floatingdecay"="Floating\n Decay","Advancedfloatingdecay"="Advanced\n Floating","SunkenRemains"="Sunken\n Remains"))+
+  annotate("text", label = expression(paste("KW,",chi^2, "= 19.3, P-adj < 0.001")), size = 3.5, x = 2.4, y = 55)#+ theme(legend.justification=c(0.05,0.95), legend.position=c(0.05,0.95))
 
 dev.off()
 tiff("Figures/faith_pdPlotDecompStage.tiff", width = 74, height = 74, units = 'mm', res = 600)
@@ -321,7 +377,7 @@ faith_pdDecomp
 theme_set(theme_bw(base_size = 9)+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
 
 dev.off()
-tiff("Figures/Figure2.tiff", width = 174, height = 174, units = 'mm', res = 600)
+tiff("Figures/Figure2NoP.tiff", width = 174, height = 174, units = 'mm', res = 600)
 ggarrange(PhylumPlotDecompStage, FamilyPlotDecompStage,ShannonDecomp,faith_pdDecomp,
           labels = c("a","b","c","d"),
           ncol = 2, nrow = 2)
@@ -397,34 +453,41 @@ adonis(GPdist ~ DecompStage, as(sample_data(SFVSEF), "data.frame"))
 ############
 #PCoA by decomp stage
 ##############33
+# metadata2<-metadata
+# metadata2$DecompStage <- gsub('SubmergedFresh', 'Submerged Fresh', metadata2$DecompStage)
+# metadata2$DecompStage <- gsub('EarlyFloating', 'Early Floating', metadata2$DecompStage)
+# metadata2$DecompStage <- gsub('Floatingdecay', 'Floating Decay', metadata2$DecompStage)
+# metadata2$DecompStage <- gsub('Advancedfloatingdecay', 'Advanced Floating Decay', metadata2$DecompStage)
+# metadata2$DecompStage <- gsub('SunkenRemains', 'Sunken Remains', metadata2$DecompStage)
+# metadata2$DecompStage = factor(metadata2$DecompStage, levels = c("Submerged Fresh","Early Floating","Floating Decay","Advanced Floating Decay","Sunken Remains")) #fixes x-axis labels
+
 metadata2<-metadata
-metadata2$DecompStage <- gsub('SubmergedFresh', 'Submerged Fresh', metadata2$DecompStage)
-metadata2$DecompStage <- gsub('EarlyFloating', 'Early Floating', metadata2$DecompStage)
-metadata2$DecompStage <- gsub('Floatingdecay', 'Floating Decay', metadata2$DecompStage)
-metadata2$DecompStage <- gsub('Advancedfloatingdecay', 'Advanced Floating Decay', metadata2$DecompStage)
-metadata2$DecompStage <- gsub('SunkenRemains', 'Sunken Remains', metadata2$DecompStage)
-metadata2$DecompStage = factor(metadata2$DecompStage, levels = c("Submerged Fresh","Early Floating","Floating Decay","Advanced Floating Decay","Sunken Remains")) #fixes x-axis labels
+metadata2$DecompStage <- gsub('SubmergedFresh', 'SF', metadata2$DecompStage)
+metadata2$DecompStage <- gsub('EarlyFloating', 'EF', metadata2$DecompStage)
+metadata2$DecompStage <- gsub('Floatingdecay', 'FD', metadata2$DecompStage)
+metadata2$DecompStage <- gsub('Advancedfloatingdecay', 'AFD', metadata2$DecompStage)
+metadata2$DecompStage <- gsub('SunkenRemains', 'SR', metadata2$DecompStage)
+metadata2$DecompStage = factor(metadata2$DecompStage, levels = c("SF","EF","FD","AFD","SR")) #fixes x-axis labels
 
 
 
 sampdat2=sample_data(metadata2)
 sample_names(sampdat2)=metadata2$id
 physeq2=merge_phyloseq(biom,sampdat2,tree)
-physeq2
-physeq2<-filter_taxa(physeq2, function (x) {sum(x > 0) > 1}, prune=TRUE)
-physeq2 #Remove singletons and zeros
+
 
 sample_data(physeq2)
 
-
+set.seed(23)
 ord=ordinate(physeq2,"PCoA", "jaccard")
-ordplot=plot_ordination(physeq2, ord,"samples", color="DecompStage",shape="DecompStage")+geom_point(size=4)+scale_colour_manual(values=cbPalette)+scale_fill_manual(values=cbPalette)
+ordplot=plot_ordination(physeq2, ord,"samples", color="DecompStage",shape="DecompStage")+geom_point(size=3.5)+scale_color_manual(values=cbPalette)+scale_fill_manual(values=cbPalette)
 ordplot<-ordplot+ stat_ellipse(type= "norm",geom = "polygon", alpha = 1/4, aes(fill = DecompStage))+
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(legend.justification=c(1,0), legend.position=c(.97,0.55),legend.background = element_rect(color="black"))
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ theme(legend.position="bottom",legend.background = element_rect(color="black"),legend.title = element_blank())+
+  scale_shape_manual(values=c(20,15,16,17,18))
+ordplot
+theme_set(theme_bw(base_size = 13)+theme(legend.title=element_blank(),panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
 
-theme_set(theme_bw(base_size = 9)+theme(legend.title=element_blank(),panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
-
-#  labels=c("Submerged Fresh", "Early Floating", "Floating Decay","Advanced Floating Decay","Sunken Remains")
+#  labels=c("Submerged Fresh", "Early Floating", "Floating Decay","Advanced Floating Decay","Sunken Remains")+scale_fill_manual(values=cbPalette)++scale_colour_manual(values=cbPalette)
 dev.off()
 
 tiff("Figures/PCoADecompStage.tiff", width = 100, height = 100, units = 'mm', res = 600)
@@ -628,7 +691,7 @@ p1<-p1 + geom_errorbar(aes(ymin=y.hat-se, ymax=y.hat+se),color="grey", width=.1)
   geom_point() +
   geom_abline(intercept=0, slope=1, linetype=2)+
   xlab("True ADH") +
-  ylab("Predicted ADH (ASV, \u00b1 95% CIs)")+annotate("text", label = "% Var explained = 80.8\n MSE = 1943.2", size = 4, x = 4500, y = 11000)#+geom_jitter(width = 0.5)
+  ylab("Predicted ADH (ASV, \u00b1 95% CIs)")+annotate("text", label = "% Var explained = 80.8\n RMSE = 1943.2", size = 4, x = 4500, y = 11000)#+geom_jitter(width = 0.5)
 p1
 
 physeq
@@ -650,7 +713,7 @@ TopPredictors<-ggplot(imp.20,aes(x=predictors,y=X.IncMSE))+geom_bar(stat="identi
 #Random Forest Genus Level
 ##############
 #Genus Level
-
+set.seed(147)
 Genus <- as.data.frame(t(otu_table(GenusAll)))
 
 Genus$id <- rownames(Genus)
@@ -673,7 +736,7 @@ mTune<-tuneRF(
   improve = 1,
   trace=F
 )
-
+tune
 
 mGenus <- randomForest(
   formula = ADH ~ .,
@@ -714,7 +777,7 @@ pGenus
 #Random Forest Family Level
 ##############
 #Family Level
-
+set.seed(147)
 Family <- as.data.frame(t(otu_table(FamilyAll)))
 
 Family$id <- rownames(Family)
@@ -756,6 +819,7 @@ pFamily
 #Random Forest Phylum Level
 ##############
 #Phylum Level
+set.seed(147)
 Phylum <- as.data.frame(t(otu_table(PhylumAll)))
 
 Phylum$id <- rownames(Phylum)
@@ -791,7 +855,7 @@ pPhylum <- ggplot(df, aes(x = y.ADH, y = y.hat))
 pPhylum<-pPhylum + geom_errorbar(aes(ymin=y.hat-se, ymax=y.hat+se),position = "dodge",color="grey", width=.1) +
   geom_abline(intercept=0, slope=1, linetype=2)+geom_point()+
   xlab("True ADH") +
-  ylab("Predicted ADH (Phylum, \u00b1 95% CIs)")+annotate("text", label = "% Var explained = 78.4\n RMSE = 2060.1", size = 4, x = 4500, y = 11000)#+geom_jitter(width = 0.5)
+  ylab("Predicted ADH (Phylum, \u00b1 95% CIs)")+annotate("text", label = "% Var explained = 79.67\n RMSE = 1997.1", size = 4, x = 4500, y = 11000)#+geom_jitter(width = 0.5)
 pPhylum
 
 #############3
