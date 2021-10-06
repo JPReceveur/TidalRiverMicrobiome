@@ -1,5 +1,6 @@
 # TidalRiverMicrobiome
-Code used in Microbial Community Succession on Submerged Vertebrate Carcasses in a Tidal Rriver 
+Code used in Microbial community succession on submerged vertebrate carcasses in a tidal river habitat: Implications for aquatic forensic investigations
+https://doi.org/10.1111/1556-4029.14869
 
 # Code files
 AquaticPigJan2020.r: Contains code used for analysis and creating figures.
