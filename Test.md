@@ -9,7 +9,7 @@ graph TD
   
   
   click B "https://umgear.org/upload_epigenetic_data.html" "Link to Epigenetic upload" _blank
-  click C "https://umgear.org/contact.html" "Link to contact form" _blank
+  click C href "https://umgear.org/contact.html" "Link to contact form" _blank
  
 
 
